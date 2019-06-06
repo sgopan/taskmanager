@@ -3,6 +3,7 @@ const Schema = mongoose.Schema
 const validator = require('validator')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
+const Task = require('../models/task')
 
 const UserSchema = new Schema({
   name: {
@@ -46,6 +47,12 @@ const UserSchema = new Schema({
   }]
 })
 
+UserSchema.virtual('tasks', {
+  ref: 'Task',
+  localField: '_id',
+  foreignField: 'owner'
+})
+
 UserSchema.methods.toJSON = function () {
   const user = this
   const userObject = user.toObject()
@@ -86,6 +93,12 @@ UserSchema.pre('save', async function (next) {
     user.password = await bcrypt.hash(user.password, 8)
   }
 
+  next()
+})
+
+UserSchema.pre('remove', async function (next) {
+  const user = this
+  await Task.deleteMany({ owner: user._id })
   next()
 })
 
