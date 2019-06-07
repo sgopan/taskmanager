@@ -16,6 +16,10 @@ const TaskSchema = new Schema({
     required: true,
     ref: 'User'
   }
+}, {
+  timestamps: {
+    createdAt: true
+  }
 })
 
 TaskSchema.pre('save', function (next) {
