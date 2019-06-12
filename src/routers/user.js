@@ -2,9 +2,9 @@ const express = require('express')
 const User = require('../db/models/user')
 const auth = require('../middleware/auth')
 const multer = require('multer')
-const upload = multer({
-  dest: 'avatars/'
-})
+const sharp = require('sharp')
+const { sendWelcomeEmail, sendCancellationEmail } = require('../email/account')
+
 const router = new express.Router()
 
 router.post('/users', async (req, res) => {
@@ -12,6 +12,7 @@ router.post('/users', async (req, res) => {
 
   try {
     let token = await user.generateAuthToken()
+    sendWelcomeEmail(user.email, user.name)
     res.status(201).send({ user, token })
   } catch (e) {
     res.status(400).send(e)
@@ -56,8 +57,25 @@ router.post('/users/logoutAll', auth, async (req, res) => {
   }
 })
 
-router.post('/users/me/avatar', upload.single('avatar'), (req, res) => {
+const upload = multer({
+  limits: {
+    fileSize: 1000000
+  },
+  fileFilter (req, file, cb) {
+    if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
+      return cb(new Error('Please upload an image'))
+    }
+    cb(undefined, true)
+  }
+})
+
+router.post('/users/me/avatar', auth, upload.single('avatar'), async (req, res) => {
+  const buffer = await sharp(req.file.buffer).resize({ width: 250, height: 250 }).png().toBuffer()
+  req.user.avatar = buffer
+  await req.user.save()
   res.send()
+}, (error, req, res, next) => {
+  res.status(400).send({ error: error.message })
 })
 
 router.get('/users/me', auth, async (req, res) => {
@@ -100,9 +118,31 @@ router.patch('/users/me', auth, async (req, res) => {
 router.delete('/users/me', auth, async (req, res) => {
   try {
     await req.user.remove()
+    sendCancellationEmail(req.user.email, req.user.name)
     res.send(req.user)
   } catch (e) {
     res.status(500).send(e)
+  }
+})
+
+router.delete('/users/me/avatar', auth, async (req, res) => {
+  req.user.avatar = undefined
+  await req.user.save()
+  res.send()
+})
+
+router.get('/users/:id/avatar', async (req, res) => {
+  const userid = req.params.id
+  try {
+    const user = await User.findById(userid)
+
+    if (!user || !user.avatar) {
+      res.status(404).send({ error: 'User not found!' })
+    }
+    res.set('Content-Type', 'image/png')
+    res.send(user.avatar)
+  } catch (e) {
+    res.status(500).send()
   }
 })
 
