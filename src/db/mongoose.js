@@ -48,7 +48,7 @@ mongoose.connect(process.env.MONGO_DB_URL, {
 //     name: 'ashwin12',
 //     age: 23,
 //     email: 'gopancd@gmail.com',
-//     password: 'Godspeed#0'
+//     password: ''
 // })
 
 // me.save().then(() => {
